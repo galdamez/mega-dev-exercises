@@ -1,0 +1,47 @@
+---
+layout: runbook
+title: '#4471 · date reports, two causes'
+owner: support desk
+status: known
+reviewed: 2026-10-30
+signature: galdamez
+---
+
+<script>
+  import CauseTable from '#lib/kb/CauseTable.svelte';
+  import QueueTimeline from '#lib/kb/QueueTimeline.svelte';
+  import Callout from '#lib/kb/Callout.svelte';
+  import RenderStamp from '#lib/kb/RenderStamp.svelte';
+
+  const issues = {
+    parser: { number: 2, url: 'https://github.com/galdamez/mega-dev-exercises/issues/2' },
+    hint: { number: 1, url: 'https://github.com/galdamez/mega-dev-exercises/issues/1' },
+  };
+</script>
+
+Since April, people have reported bookings landing on the wrong day. By 4 October, the desk
+had merged the reports into #4471. The export overlaps some report IDs, so the table counts
+each unique report once.
+
+The merge contains two causes, not one. Classify reports by tenant configuration and channel;
+the intake tag is only a guess.
+
+<Callout>
+Known. #4471 is the historical merge; track each root cause in its own issue below.
+</Callout>
+
+## What the reports show
+
+<CauseTable ticket={4471} {issues} />
+
+## Since April
+
+<QueueTimeline ticket={4471} />
+
+## Lessons
+
+- Deduplicate by report ID, then group by cause rather than intake tag.
+- Keep date parsing and form guidance as separate fixes.
+- Review the source data while the queue is still in your head.
+
+<RenderStamp {signature} />
