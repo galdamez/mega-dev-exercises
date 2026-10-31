@@ -4,7 +4,7 @@
   import { groupByCause, readAs, uniqueById, type CauseGroup, type Report } from '#lib/kb/causes';
   import { tenantOf } from '#lib/kb/locales';
 
-  type TrackingIssue = { number: number; url: string };
+  type TrackingIssue = { number: number; url: string; outcome: string; update: string };
   let {
     ticket,
     issues,
@@ -27,7 +27,7 @@
 
 <table>
   <thead>
-    <tr><th>cause</th><th>reports</th><th>tagged as</th><th>tenants</th><th>seen</th><th>tracking issue</th></tr>
+    <tr><th>cause</th><th>reports</th><th>tagged as</th><th>tenants</th><th>seen</th><th>desk update</th><th>tracking issue</th></tr>
   </thead>
   <tbody>
     {#each groups as g (g.cause)}
@@ -38,6 +38,7 @@
         <td class="tags">{tags(g)}</td>
         <td>{g.tenants}</td>
         <td>{g.firstSeen} → {g.lastSeen}</td>
+        <td>{issue ? `${issue.outcome} · ${issue.update}` : 'needs triage'}</td>
         <td>{#if issue}<a href={issue.url}>#{issue.number}</a>{:else}needs triage{/if}</td>
       </tr>
     {/each}

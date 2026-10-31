@@ -2,8 +2,8 @@
 layout: runbook
 title: '#4471 · date reports, two causes'
 owner: support desk
-status: known
-reviewed: 2026-10-30
+status: closed
+reviewed: 2026-10-31
 signature: galdamez
 ---
 
@@ -14,8 +14,18 @@ signature: galdamez
   import RenderStamp from '#lib/kb/RenderStamp.svelte';
 
   const issues = {
-    parser: { number: 2, url: 'https://github.com/galdamez/mega-dev-exercises/issues/2' },
-    hint: { number: 1, url: 'https://github.com/galdamez/mega-dev-exercises/issues/1' },
+    parser: {
+      number: 2,
+      url: 'https://github.com/galdamez/mega-dev-exercises/issues/2',
+      outcome: 'fixed',
+      update: 'fix(dates): parse dd/mm for eu locales',
+    },
+    hint: {
+      number: 1,
+      url: 'https://github.com/galdamez/mega-dev-exercises/issues/1',
+      outcome: "won't fix",
+      update: 'booking-v3 form retired',
+    },
   };
 </script>
 
@@ -27,7 +37,8 @@ The merge contains two causes, not one. Classify reports by tenant configuration
 the intake tag is only a guess.
 
 <Callout>
-Known. #4471 is the historical merge; track each root cause in its own issue below.
+Closed 5 October. The parser was fixed; the booking-v3 form was retired, so its hint issue
+will not be fixed.
 </Callout>
 
 ## What the reports show

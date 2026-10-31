@@ -34,7 +34,9 @@ Support desk. Decision records: whoever signed them.
 ## Challenge page preview
 
 The revised #4471 page is in `src/routes/kb/incidents/4471/+page.svx`. Open
-`preview/4471.html` for a standalone view of the page and its current report counts.
+`preview/4471.html` for a standalone rendering of the page and its current report counts.
+The export does not include the SvelteKit package/build configuration, so this preview
+reproduces the page layout and component output without the original app runtime.
 
 ---
 
