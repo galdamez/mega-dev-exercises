@@ -33,10 +33,11 @@ Support desk. Decision records: whoever signed them.
 
 ## Challenge page preview
 
-The revised #4471 page is in `src/routes/kb/incidents/4471/+page.svx`. Open
-`preview/4471.html` for a standalone rendering of the page and its current report counts.
-The export does not include the SvelteKit package/build configuration, so this preview
-reproduces the page layout and component output without the original app runtime.
+The revised #4471 page is in `src/routes/kb/incidents/4471/+page.svx`. The app is configured
+with SvelteKit and MDsveX so the route is compiled and rendered from its source. With Node.js
+20.19+ or 22.12+, run `npm ci`, `npm run check`, and `npm run build` to generate the static
+site in `preview/site/`. Open `preview/site/kb/incidents/4471/index.html` to inspect the
+rendered page.
 
 ---
 
