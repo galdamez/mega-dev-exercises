@@ -70,10 +70,10 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          prompt='Use the /incident-lookup skill to complete only the job assigned by the job-1 MCP server. Submit the job. Keep a complete request/reply log in .mega-s02e04-log.jsonl, masking the job URL, tokens, tickets, and receipts in the log. Preserve the exact submitted result and receipt. Return only one JSON object with keys "result" and "receipt", with no markdown or extra text.'
+          prompt='Use the /incident-lookup skill to complete only the job assigned by the job-1 MCP server. Submit the job. Keep a complete request/reply log in .mega-s02e04-log.jsonl, masking the job URL, tokens, tickets, and receipts in the log. After submit succeeds, write the exact submitted result and receipt as valid JSON with keys "result" and "receipt" to .mega-s02e04-result.json. Do not include the receipt in the log. Return only DONE.'
           if ! copilot -p "$prompt" -s \
-            --allow-tool='job-1, write(.mega-s02e04-log.jsonl)' \
-            > "$RUNNER_TEMP/worker-output.json" \
+            --allow-tool='job-1, write(.mega-s02e04-log.jsonl), write(.mega-s02e04-result.json)' \
+            > "$RUNNER_TEMP/worker-final.txt" \
             2> "$RUNNER_TEMP/worker-stderr.log"; then
             echo "::error::The job-1 worker failed; its plaintext output was not logged."
             exit 1
@@ -90,9 +90,8 @@ jobs:
           const fs = require("node:fs");
           const path = require("node:path");
 
-          const output = JSON.parse(
-            fs.readFileSync(path.join(process.env.RUNNER_TEMP, "worker-output.json"), "utf8")
-          );
+          const outputPath = path.join(process.env.GITHUB_WORKSPACE, ".mega-s02e04-result.json");
+          const output = JSON.parse(fs.readFileSync(outputPath, "utf8"));
           if (!output || typeof output !== "object" || !("result" in output)) {
             throw new Error("Worker output must include result and receipt");
           }
@@ -167,6 +166,7 @@ jobs:
             JSON.stringify(envelope),
             { mode: 0o600 }
           );
+          fs.unlinkSync(outputPath);
           NODE
 
       - uses: actions/upload-artifact@v4
