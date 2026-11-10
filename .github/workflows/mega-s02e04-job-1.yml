@@ -1,0 +1,176 @@
+name: MEGA S02E04 job 1
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  copilot-requests: write
+
+jobs:
+  incident-lookup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install Copilot CLI
+        run: npm install --global @github/copilot
+
+      - name: Download incident-lookup skill
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --location \
+            https://hq.mega.dev/media/two-places/incident-lookup-03b5d3a7.zip \
+            --output "$RUNNER_TEMP/incident-lookup.zip"
+          mkdir -p "$RUNNER_TEMP/incident-lookup"
+          unzip -q "$RUNNER_TEMP/incident-lookup.zip" -d "$RUNNER_TEMP/incident-lookup"
+          skill_file="$(find "$RUNNER_TEMP/incident-lookup" -type f -name SKILL.md -print -quit)"
+          test -n "$skill_file"
+          mkdir -p .github/skills/incident-lookup
+          cp -R "$(dirname "$skill_file")"/. .github/skills/incident-lookup/
+
+      - name: Configure the job-only MCP server
+        shell: bash
+        env:
+          MEGA_JOB_1_URL: ${{ secrets.MEGA_JOB_1_URL }}
+        run: |
+          set -euo pipefail
+          test -n "$MEGA_JOB_1_URL"
+          mkdir -p "$HOME/.copilot"
+          node <<'NODE'
+          const fs = require("node:fs");
+          const path = require("node:path");
+          const url = process.env.MEGA_JOB_1_URL;
+          if (!url) throw new Error("MEGA_JOB_1_URL is required");
+          const config = {
+            mcpServers: {
+              "job-1": {
+                type: "http",
+                url,
+                tools: ["*"]
+              }
+            }
+          };
+          fs.writeFileSync(
+            path.join(process.env.HOME, ".copilot", "mcp-config.json"),
+            JSON.stringify(config),
+            { mode: 0o600 }
+          );
+          NODE
+
+      - name: Run incident-lookup worker
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          prompt='Use the /incident-lookup skill to complete only the job assigned by the job-1 MCP server. Submit the job. Keep a complete request/reply log in .mega-s02e04-log.jsonl, masking the job URL, tokens, tickets, and receipts in the log. Preserve the exact submitted result and receipt. Return only one JSON object with keys "result" and "receipt", with no markdown or extra text.'
+          if ! copilot -p "$prompt" -s \
+            --allow-tool='job-1, write(.mega-s02e04-log.jsonl)' \
+            > "$RUNNER_TEMP/worker-output.json" \
+            2> "$RUNNER_TEMP/worker-stderr.log"; then
+            echo "::error::The job-1 worker failed; its plaintext output was not logged."
+            exit 1
+          fi
+
+      - name: Encrypt the result and sanitized log
+        shell: bash
+        env:
+          MEGA_JOB_1_URL: ${{ secrets.MEGA_JOB_1_URL }}
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const crypto = require("node:crypto");
+          const fs = require("node:fs");
+          const path = require("node:path");
+
+          const output = JSON.parse(
+            fs.readFileSync(path.join(process.env.RUNNER_TEMP, "worker-output.json"), "utf8")
+          );
+          if (!output || typeof output !== "object" || !("result" in output)) {
+            throw new Error("Worker output must include result and receipt");
+          }
+          if (typeof output.receipt !== "string" || output.receipt.length === 0) {
+            throw new Error("Worker output must include a non-empty receipt");
+          }
+
+          const logPath = path.join(process.env.GITHUB_WORKSPACE, ".mega-s02e04-log.jsonl");
+          let log = fs.readFileSync(logPath, "utf8");
+          if (log.trim().length === 0) throw new Error("Worker log is empty");
+          const jobUrl = process.env.MEGA_JOB_1_URL;
+          if (jobUrl) log = log.split(jobUrl).join("[REDACTED]");
+          log = log.replace(
+            /https:\/\/hq\.mega\.dev\/mcp\/job\/v1\.[^\s"'\\]+/g,
+            "[REDACTED]"
+          );
+          log = log.replace(
+            /("(?:receipt|ticket|token|authorization)"\s*:\s*")[^"]*(")/gi,
+            "$1[REDACTED]$2"
+          );
+          log = log.replace(/\b(?:gh[pousr]_[A-Za-z0-9_]+|Bearer\s+\S+)/g, "[REDACTED]");
+          log = log.split(output.receipt).join("[REDACTED]");
+          if (jobUrl && log.includes(jobUrl)) {
+            throw new Error("The sanitized log still contains the job URL");
+          }
+          if (log.includes(output.receipt)) {
+            throw new Error("The sanitized log still contains the receipt");
+          }
+          fs.writeFileSync(logPath, log, { mode: 0o600 });
+
+          const payload = JSON.stringify({
+            job: "job-1",
+            result: output.result,
+            receipt: output.receipt,
+            log
+          });
+          const publicKey = `-----BEGIN PUBLIC KEY-----
+          MIIBojANBgkqhkiG9w0BAQEFAAOCAY8AMIIBigKCAYEArjrOQt1ijIvHveCdrCLy
+          JKD6QvQnTiEitUWCtDImi2vp34Jv4gyAQ9BJf/4GDln9/LFGq5DmWYtfiVMd0JBu
+          1HvZ89HCRG5Mx2dmfKVj74VMWsNDr8iUac5cPOJgV7WluE1BlyRvplFTa3CLFLVA
+          mcKnrkcLNN8WMJkB9X5mYCGsSx4TgAvzeQE667v98PsliWrNtDlXm4WEDIXLQJX/
+          TB7RYzISOtJamVBCBQQprT9BcARAiM96Q4dBVFwBEUS3BPVEfE4cQA/TJO9yxuap
+          KsEvFeXDvLRQfNjtF6wigwFTOTwh2X9U9i25pVM8npFtQzBjR1TAN2Pk2syAvM8m
+          wU/3pIpcczOqJ6DRwB95JEIfmopmqJMi5vWo/mc0x2+TKg2fy5tH13gbyf0P8xRB
+          Xaz80IGyHaIxwmPB+WZbFe7VfYZrt0A8wmv716Fe/xs+QpX/e+vjtyQ7R6Xq9XXu
+          Kgp+egmOstWE7nUrdkAq9/a7Z33GCjJmgUqHQE9bj0r9AgMBAAE=
+          -----END PUBLIC KEY-----`.replace(/^\s+/gm, "");
+          const key = crypto.randomBytes(32);
+          const iv = crypto.randomBytes(12);
+          const cipher = crypto.createCipheriv("aes-256-gcm", key, iv);
+          const ciphertext = Buffer.concat([
+            cipher.update(payload, "utf8"),
+            cipher.final()
+          ]);
+          const wrappedKey = crypto.publicEncrypt(
+            {
+              key: publicKey,
+              padding: crypto.constants.RSA_PKCS1_OAEP_PADDING,
+              oaepHash: "sha256"
+            },
+            key
+          );
+          const envelope = {
+            version: 1,
+            wrappedKey: wrappedKey.toString("base64"),
+            iv: iv.toString("base64"),
+            tag: cipher.getAuthTag().toString("base64"),
+            ciphertext: ciphertext.toString("base64")
+          };
+          fs.writeFileSync(
+            path.join(process.env.RUNNER_TEMP, "s02e04-job-1.enc.json"),
+            JSON.stringify(envelope),
+            { mode: 0o600 }
+          );
+          NODE
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: s02e04-job-1-encrypted-output
+          path: ${{ runner.temp }}/s02e04-job-1.enc.json
+          retention-days: 1
